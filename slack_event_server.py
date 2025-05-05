@@ -2,34 +2,26 @@ from flask import Flask, request, jsonify
 import os
 import json
 import threading
+import time
 from datetime import datetime
-
-from slack_client import (
-    download_file,
-    get_username_from_id,
-    get_channel_name_from_id
-)
-from drive_client import (
-    get_drive_service,
-    upload_file_to_drive,
-    get_or_create_subfolder
-)
+from slack_client import download_file, get_username_from_id, get_channel_name_from_id
+from drive_client import get_drive_service, upload_file_to_drive, get_or_create_subfolder
 
 app = Flask(__name__)
 
-# Load config
-with open("config.json") as f:
-    config = json.load(f)
+# Load config from environment variables
+SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 
-SLACK_BOT_TOKEN = config["slack_bot_token"]
-GOOGLE_CREDENTIALS_FILE = config["google_credentials_file"]
-ARCHIVE_FOLDER_ID = config["slack_archive_folder_id"]
+if "GOOGLE_CREDENTIALS_JSON" in os.environ:
+    creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
+else:
+    with open("credentials.json") as f:
+        creds_dict = json.load(f)
 
-drive_service = get_drive_service(GOOGLE_CREDENTIALS_FILE)
-print("Using credentials file:", GOOGLE_CREDENTIALS_FILE)
+GOOGLE_DRIVE_FOLDER_ID = os.environ["GOOGLE_DRIVE_FOLDER_ID"]
 
-# Folder cache to prevent duplicate creation
-subfolder_cache = {}
+drive_service = get_drive_service(creds_dict)
+print("Drive service initialized.")
 
 @app.route("/slack/events", methods=["POST"])
 def slack_events():
@@ -39,63 +31,35 @@ def slack_events():
         return jsonify({"challenge": data["challenge"]})
 
     event = data.get("event", {})
-
-    # Ignore thread replies
-    if event.get("thread_ts") and event["thread_ts"] != event["ts"]:
-        print("Skipping thread reply")
-        return "", 200
-
-    if event.get("type") == "message":
+    if event.get("type") == "message" and not event.get("thread_ts"):
         files = event.get("files", [])
         text = event.get("text", "")
         user_id = event.get("user", "unknown")
         user = get_username_from_id(user_id, SLACK_BOT_TOKEN)
-        channel_id = event.get("channel")
-        channel_name = get_channel_name_from_id(channel_id, SLACK_BOT_TOKEN).strip()
+        channel_id = event.get("channel", "unknown")
+        channel = get_channel_name_from_id(channel_id, SLACK_BOT_TOKEN)
 
+        timestamp = float(event['ts'])
+        dt = datetime.fromtimestamp(timestamp)
+        timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
 
         def process():
-            ts = float(event["ts"])
-            dt = datetime.fromtimestamp(ts)
-            timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
+            print(f"Processing message from {user} in #{channel} at {timestamp_str}")
+            channel_folder = get_or_create_subfolder(drive_service, GOOGLE_DRIVE_FOLDER_ID, channel)
 
-            has_text = bool(text.strip())
-            has_files = any(f.get("mimetype", "").startswith(("image/", "video/")) for f in files)
+            has_text = text.strip() != ""
+            has_attachments = any(f.get("mimetype", "").startswith(("image/", "video/")) for f in files)
 
-            # Decide target category folder
-            if has_text and has_files:
-                category = "Captioned Posts"
-            elif has_text:
-                category = "Messages"
-            elif has_files:
-                category = "Attachments"
-            else:
-                return  # Skip completely empty messages
-
-            # Step 1: Get or create the channel folder
-            channel_folder_id = subfolder_cache.get(channel_name)
-            if not channel_folder_id:
-                channel_folder_id = get_or_create_subfolder(drive_service, ARCHIVE_FOLDER_ID, channel_name)
-                subfolder_cache[channel_name] = channel_folder_id
-
-            # Step 2: Get or create the category folder inside the channel
-            subfolder_key = f"{channel_name}/{category}"
-            category_folder_id = subfolder_cache.get(subfolder_key)
-            if not category_folder_id:
-                category_folder_id = get_or_create_subfolder(drive_service, channel_folder_id, category)
-                subfolder_cache[subfolder_key] = category_folder_id
-
-            # Upload message text
-            if has_text:
-                os.makedirs("messages", exist_ok=True)
-                prefix = "caption" if category == "Captioned Posts" else category.lower()
-                txt_filename = f"{prefix}_FROM_{user}_{timestamp_str}.txt"
-                filepath = os.path.join("messages", txt_filename)
-                with open(filepath, "w", encoding="utf-8") as f:
+            # Upload text message only
+            if has_text and not has_attachments:
+                msg_folder = get_or_create_subfolder(drive_service, channel_folder, "Messages")
+                filename = f"message_FROM_{user}_{timestamp_str}.txt"
+                with open(filename, "w", encoding="utf-8") as f:
                     f.write(text)
-                upload_file_to_drive(drive_service, filepath, category_folder_id)
+                upload_file_to_drive(drive_service, filename, msg_folder)
+                os.remove(filename)
 
-            # Upload image/video files
+            # Upload each attachment
             for f_data in files:
                 mimetype = f_data.get("mimetype", "")
                 if mimetype.startswith(("image/", "video/")):
@@ -105,14 +69,24 @@ def slack_events():
                     }
                     local_path = download_file(file_info, SLACK_BOT_TOKEN)
                     if local_path:
-                        orig_name = file_info["name"]
-                        name_root, ext = os.path.splitext(orig_name)
-                        new_name = f"{name_root}_FROM_{user}_{timestamp_str}{ext}"
-
-                        os.makedirs("attachments", exist_ok=True)
-                        new_path = os.path.join("attachments", new_name)
-                        os.rename(local_path, new_path)
-                        upload_file_to_drive(drive_service, new_path, category_folder_id)
+                        if has_text:
+                            caption_folder = get_or_create_subfolder(drive_service, channel_folder, "Captioned Posts")
+                            prefix = "caption"
+                            txt_filename = f"{prefix}_FROM_{user}_{timestamp_str}.txt"
+                            with open(txt_filename, "w", encoding="utf-8") as f:
+                                f.write(text)
+                            upload_file_to_drive(drive_service, txt_filename, caption_folder)
+                            upload_name = f"{os.path.splitext(file_info['name'])[0]}_FROM_{user}_{timestamp_str}{os.path.splitext(file_info['name'])[1]}"
+                            os.rename(local_path, upload_name)
+                            upload_file_to_drive(drive_service, upload_name, caption_folder)
+                            os.remove(txt_filename)
+                            os.remove(upload_name)
+                        else:
+                            attach_folder = get_or_create_subfolder(drive_service, channel_folder, "Attachments")
+                            upload_name = f"{os.path.splitext(file_info['name'])[0]}_FROM_{user}_{timestamp_str}{os.path.splitext(file_info['name'])[1]}"
+                            os.rename(local_path, upload_name)
+                            upload_file_to_drive(drive_service, upload_name, attach_folder)
+                            os.remove(upload_name)
 
         threading.Thread(target=process).start()
 
@@ -120,6 +94,5 @@ def slack_events():
 
 if __name__ == "__main__":
     app.run(port=5000)
-
 
 

@@ -3,9 +3,9 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-def get_drive_service(creds_file):
-    creds = service_account.Credentials.from_service_account_file(
-        creds_file,
+def get_drive_service(creds_dict):
+    creds = service_account.Credentials.from_service_account_info(
+        creds_dict,
         scopes=['https://www.googleapis.com/auth/drive']
     )
     return build('drive', 'v3', credentials=creds)
