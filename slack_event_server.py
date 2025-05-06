@@ -61,7 +61,8 @@ def slack_events():
                 upload_file_to_drive(drive_service, filename, msg_folder)
                 os.remove(filename)
 
-            # Upload all attachments
+            caption_uploaded = False 
+
             for f_data in files:
                 mimetype = f_data.get("mimetype", "")
                 file_info = {
@@ -71,7 +72,7 @@ def slack_events():
                 local_path = download_file(file_info, SLACK_BOT_TOKEN)
                 if not local_path:
                     continue
-
+                
                 # Determine category
                 if mimetype.startswith("image/") or mimetype.startswith("video/"):
                     category = "Captioned Posts" if has_text else "Attachments"
@@ -80,14 +81,14 @@ def slack_events():
 
                 folder = get_or_create_subfolder(drive_service, channel_folder, category)
 
-                # Upload caption (only once per message)
-                if has_text and category == "Captioned Posts":
+                # Upload caption once
+                if has_text and category == "Captioned Posts" and not caption_uploaded:
                     caption_filename = f"caption_FROM_{user}_{timestamp_str}.txt"
                     with open(caption_filename, "w", encoding="utf-8") as f:
                         f.write(text)
                     upload_file_to_drive(drive_service, caption_filename, folder)
                     os.remove(caption_filename)
-                    has_text = False  # Avoid uploading caption multiple times
+                    caption_uploaded = True
 
                 # Upload file
                 ext = os.path.splitext(file_info['name'])[1]
