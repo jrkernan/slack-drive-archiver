@@ -1,30 +1,30 @@
-import os
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# Global folder cache: { (parent_id, folder_name): folder_id }
+# Global cache to avoid duplicate folder creation
 folder_cache = {}
 
 def get_drive_service(creds_dict):
     creds = service_account.Credentials.from_service_account_info(
         creds_dict,
-        scopes=['https://www.googleapis.com/auth/drive']
+        scopes=["https://www.googleapis.com/auth/drive"]
     )
-    return build('drive', 'v3', credentials=creds)
+    return build("drive", "v3", credentials=creds)
 
 def upload_file_to_drive(service, filepath, folder_id):
     file_metadata = {
-        'name': os.path.basename(filepath),
-        'parents': [folder_id]
+        "name": filepath,
+        "parents": [folder_id]
     }
     media = MediaFileUpload(filepath, resumable=True)
     uploaded = service.files().create(
         body=file_metadata,
         media_body=media,
+        fields="id",
         supportsAllDrives=True
     ).execute()
-    print(f"Uploaded to Drive: {uploaded['name']}")
+    print(f"Uploaded to Drive: {filepath}")
 
 def get_or_create_subfolder(service, parent_id, folder_name):
     key = (parent_id, folder_name)
