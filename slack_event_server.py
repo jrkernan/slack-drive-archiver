@@ -33,7 +33,7 @@ def slack_events():
         return jsonify({"challenge": data["challenge"]})
 
     event = data.get("event", {})
-    if event.get("type") == "message" and not event.get("thread_ts"):
+    if event.get("type") == "message" and event.get("subtype") != "message_replied":
         files = event.get("files", [])
         text = event.get("text", "")
         user_id = event.get("user", "unknown")
@@ -61,7 +61,8 @@ def slack_events():
                 upload_file_to_drive(drive_service, filename, msg_folder)
                 os.remove(filename)
 
-            caption_uploaded = False 
+            caption_uploaded = False
+            attachment_counter = 1
 
             for f_data in files:
                 mimetype = f_data.get("mimetype", "")
@@ -90,12 +91,19 @@ def slack_events():
                     os.remove(caption_filename)
                     caption_uploaded = True
 
-                # Upload file
+                # Build filename
                 ext = os.path.splitext(file_info['name'])[1]
-                upload_name = f"{category.lower().replace(' ', '_')}_FROM_{user}_{timestamp_str}{ext}"
+                if category == "Captioned Posts":
+                    base = f"attachment{attachment_counter}_FROM_{user}_{timestamp_str}"
+                else:
+                    base = f"{category.lower().replace(' ', '_')}_FROM_{user}_{timestamp_str}"
+                upload_name = f"{base}{ext}"
+
                 os.rename(local_path, upload_name)
                 upload_file_to_drive(drive_service, upload_name, folder)
                 os.remove(upload_name)
+
+                attachment_counter += 1
 
         threading.Thread(target=process).start()
 
