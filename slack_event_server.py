@@ -55,7 +55,7 @@ def slack_events():
             # Upload text-only message
             if has_text and not has_attachments:
                 msg_folder = get_or_create_subfolder(drive_service, channel_folder, "Messages")
-                filename = f"message_FROM_{user}_{timestamp_str}.txt"
+                filename = f"{timestamp_str}_message_FROM_{user}.txt"
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(text)
                 upload_file_to_drive(drive_service, filename, msg_folder)
@@ -85,7 +85,7 @@ def slack_events():
 
                 # Upload caption once (for captioned posts)
                 if has_text and category == "Captioned Posts" and not caption_uploaded:
-                    caption_filename = f"caption_FROM_{user}_{timestamp_str}.txt"
+                    caption_filename = f"{timestamp_str}_caption_FROM_{user}.txt"
                     with open(caption_filename, "w", encoding="utf-8") as f:
                         f.write(text)
                     upload_file_to_drive(drive_service, caption_filename, folder)
