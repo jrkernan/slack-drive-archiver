@@ -64,7 +64,7 @@ def slack_events():
             caption_uploaded = False
             attachment_counter = 1
             total_attachments = len(files)
-            
+
             for f_data in files:
                 mimetype = f_data.get("mimetype", "")
                 file_info = {
@@ -80,9 +80,9 @@ def slack_events():
                     category = "Captioned Posts" if has_text else "Attachments"
                 else:
                     category = "Miscellaneous"
-            
+
                 folder = get_or_create_subfolder(drive_service, channel_folder, category)
-            
+
                 # Upload caption once (for captioned posts)
                 if has_text and category == "Captioned Posts" and not caption_uploaded:
                     caption_filename = f"caption_FROM_{user}_{timestamp_str}.txt"
@@ -91,21 +91,21 @@ def slack_events():
                     upload_file_to_drive(drive_service, caption_filename, folder)
                     os.remove(caption_filename)
                     caption_uploaded = True
-            
+
                 # Build filename
                 ext = os.path.splitext(file_info['name'])[1]
-            
+
                 if total_attachments == 1:
-                    base = f"attachment_FROM_{user}_{timestamp_str}"
+                    base = f"{timestamp_str}_attachment_FROM_{user}"
                 else:
-                    base = f"attachment{attachment_counter}_FROM_{user}_{timestamp_str}"
-            
+                    base = f"{timestamp_str}_attachment{attachment_counter}_FROM_{user}"
+
                 upload_name = f"{base}{ext}"
-            
+
                 os.rename(local_path, upload_name)
                 upload_file_to_drive(drive_service, upload_name, folder)
                 os.remove(upload_name)
-            
+
                 attachment_counter += 1
 
         threading.Thread(target=process).start()
