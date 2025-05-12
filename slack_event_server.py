@@ -33,7 +33,14 @@ def slack_events():
         return jsonify({"challenge": data["challenge"]})
 
     event = data.get("event", {})
-    if event.get("type") == "message" and event.get("subtype") != "message_replied":
+    if event.get("type") == "message" and "subtype" not in event:
+        is_text_only = not event.get("files") and event.get("text", "").strip() != ""
+        is_thread_reply = event.get("thread_ts") and event["thread_ts"] != event["ts"]
+
+        # Skip if it's just a text reply in a thread
+        if is_text_only and is_thread_reply:
+            return "", 200
+
         files = event.get("files", [])
         text = event.get("text", "")
         user_id = event.get("user", "unknown")
@@ -41,21 +48,25 @@ def slack_events():
         channel_id = event.get("channel", "unknown")
         channel = get_channel_name_from_id(channel_id, SLACK_BOT_TOKEN)
 
-        timestamp = float(event['ts'])
+        timestamp = float(event["ts"])
         dt = datetime.fromtimestamp(timestamp)
         timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
 
         def process():
             print(f"Processing message from {user} in #{channel} at {timestamp_str}")
-            channel_folder = get_or_create_subfolder(drive_service, GOOGLE_DRIVE_FOLDER_ID, channel)
+            channel_folder = get_or_create_subfolder(
+                drive_service, GOOGLE_DRIVE_FOLDER_ID, channel
+            )
 
             has_text = text.strip() != ""
             has_attachments = bool(files)
 
             # Upload text-only message
             if has_text and not has_attachments:
-                msg_folder = get_or_create_subfolder(drive_service, channel_folder, "Messages")
-                filename = f"{timestamp_str}_message_FROM_{user}.txt"
+                msg_folder = get_or_create_subfolder(
+                    drive_service, channel_folder, "Messages"
+                )
+                filename = f"{timestamp_str}_FROM_{user}.txt"
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(text)
                 upload_file_to_drive(drive_service, filename, msg_folder)
@@ -74,32 +85,29 @@ def slack_events():
                 local_path = download_file(file_info, SLACK_BOT_TOKEN)
                 if not local_path:
                     continue
-                
+
                 # Determine category
-                if mimetype.startswith("image/") or mimetype.startswith("video/"):
+                if mimetype.startswith(("image/", "video/")):
                     category = "Captioned Posts" if has_text else "Attachments"
                 else:
                     category = "Miscellaneous"
 
                 folder = get_or_create_subfolder(drive_service, channel_folder, category)
 
-                # Upload caption once (for captioned posts)
+                # Upload caption once
                 if has_text and category == "Captioned Posts" and not caption_uploaded:
-                    caption_filename = f"{timestamp_str}_caption_FROM_{user}.txt"
+                    caption_filename = f"{timestamp_str}_FROM_{user}.txt"
                     with open(caption_filename, "w", encoding="utf-8") as f:
                         f.write(text)
                     upload_file_to_drive(drive_service, caption_filename, folder)
                     os.remove(caption_filename)
                     caption_uploaded = True
 
-                # Build filename
-                ext = os.path.splitext(file_info['name'])[1]
-
+                ext = os.path.splitext(file_info["name"])[1]
                 if total_attachments == 1:
-                    base = f"{timestamp_str}_attachment_FROM_{user}"
+                    base = f"{timestamp_str}_FROM_{user}"
                 else:
-                    base = f"{timestamp_str}_attachment{attachment_counter}_FROM_{user}"
-
+                    base = f"{timestamp_str}_{attachment_counter}_FROM_{user}"
                 upload_name = f"{base}{ext}"
 
                 os.rename(local_path, upload_name)
@@ -114,6 +122,4 @@ def slack_events():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
-
+    
