@@ -52,19 +52,21 @@ def slack_events():
         dt = datetime.fromtimestamp(timestamp)
         timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
 
+        print(json.dumps(event, indent=2))
+        
         def process():
             print(f"Processing message from {user} in #{channel} at {timestamp_str}")
             channel_folder = get_or_create_subfolder(
                 drive_service, GOOGLE_DRIVE_FOLDER_ID, channel
             )
-        
+
             has_text = text.strip() != ""
             has_attachments = bool(files)
-        
+
             if not has_text and not has_attachments:
                 print(f"[Warning] No text or files found in message at {timestamp_str}")
                 return
-        
+
             # Upload text-only message
             if has_text and not has_attachments:
                 msg_folder = get_or_create_subfolder(
@@ -76,22 +78,22 @@ def slack_events():
                 upload_file_to_drive(drive_service, filename, msg_folder)
                 os.remove(filename)
                 return
-        
+
             caption_uploaded = False
             attachment_counter = 1
             total_attachments = len(files)
-        
+
             if not files:
                 print(f"[Warning] Files field empty — no attachments to upload")
                 return
-        
+
             for f_data in files:
                 mimetype = f_data.get("mimetype", "")
                 file_info = {
                     "url": f_data.get("url_private", ""),
                     "name": f_data.get("name", "")
                 }
-        
+
                 local_path = download_file(file_info, SLACK_BOT_TOKEN)
                 if not local_path:
                     print(f"[Error] Failed to download file: {file_info['name']}")
@@ -101,9 +103,9 @@ def slack_events():
                     category = "Captioned Posts" if has_text else "Attachments"
                 else:
                     category = "Miscellaneous"
-        
+
                 folder = get_or_create_subfolder(drive_service, channel_folder, category)
-        
+
                 if has_text and category == "Captioned Posts" and not caption_uploaded:
                     caption_filename = f"{timestamp_str}_FROM_{user}.txt"
                     with open(caption_filename, "w", encoding="utf-8") as f:
@@ -111,18 +113,18 @@ def slack_events():
                     upload_file_to_drive(drive_service, caption_filename, folder)
                     os.remove(caption_filename)
                     caption_uploaded = True
-        
+
                 ext = os.path.splitext(file_info["name"])[1]
                 if total_attachments == 1:
                     base = f"{timestamp_str}_FROM_{user}"
                 else:
                     base = f"{timestamp_str}_{attachment_counter}_FROM_{user}"
                 upload_name = f"{base}{ext}"
-        
+
                 os.rename(local_path, upload_name)
                 upload_file_to_drive(drive_service, upload_name, folder)
                 os.remove(upload_name)
-        
+
                 attachment_counter += 1
 
         threading.Thread(target=process).start()
