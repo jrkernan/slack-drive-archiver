@@ -55,6 +55,7 @@ def slack_events():
         timestamp = float(event["ts"])
         dt = datetime.fromtimestamp(timestamp)
         timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
+        thread_note = "in_thread_" if is_thread_reply else ""
 
         def process():
             print(f"Processing message from {user} in #{channel} at {timestamp_str}")
@@ -74,7 +75,7 @@ def slack_events():
                 msg_folder = get_or_create_subfolder(
                     drive_service, channel_folder, "Messages"
                 )
-                filename = f"{timestamp_str}_FROM_{user}.txt"
+                filename = f"{timestamp_str}_{thread_note}_FROM_{user}.txt"
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(text)
                 upload_file_to_drive(drive_service, filename, msg_folder)
@@ -109,7 +110,7 @@ def slack_events():
                 folder = get_or_create_subfolder(drive_service, channel_folder, category)
 
                 if has_text and category == "Captioned Posts" and not caption_uploaded:
-                    caption_filename = f"{timestamp_str}_FROM_{user}.txt"
+                    caption_filename = f"{timestamp_str}_{thread_note}_FROM_{user}.txt"
                     with open(caption_filename, "w", encoding="utf-8") as f:
                         f.write(text)
                     upload_file_to_drive(drive_service, caption_filename, folder)
@@ -118,9 +119,9 @@ def slack_events():
 
                 ext = os.path.splitext(file_info["name"])[1]
                 if total_attachments == 1:
-                    base = f"{timestamp_str}_FROM_{user}"
+                    base = f"{timestamp_str}_{thread_note}_FROM_{user}"
                 else:
-                    base = f"{timestamp_str}_{attachment_counter}_FROM_{user}"
+                    base = f"{timestamp_str}_{thread_note}{attachment_counter}_FROM_{user}"
                 upload_name = f"{base}{ext}"
 
                 os.rename(local_path, upload_name)
