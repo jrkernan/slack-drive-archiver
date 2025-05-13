@@ -33,6 +33,7 @@ def slack_events():
         return jsonify({"challenge": data["challenge"]})
 
     event = data.get("event", {})
+    print(json.dumps(event, indent=2))
     if event.get("type") == "message" and "subtype" not in event:
         is_text_only = not event.get("files") and event.get("text", "").strip() != ""
         is_thread_reply = event.get("thread_ts") and event["thread_ts"] != event["ts"]
@@ -52,8 +53,6 @@ def slack_events():
         dt = datetime.fromtimestamp(timestamp)
         timestamp_str = dt.strftime("%Y-%m-%d_%H-%M-%S")
 
-        print(json.dumps(event, indent=2))
-        
         def process():
             print(f"Processing message from {user} in #{channel} at {timestamp_str}")
             channel_folder = get_or_create_subfolder(
