@@ -33,13 +33,16 @@ def slack_events():
         return jsonify({"challenge": data["challenge"]})
 
     event = data.get("event", {})
-    print(json.dumps(event, indent=2))
-    if event.get("type") == "message" and "subtype" not in event:
+
+    #print(json.dumps(event, indent=2))  ---- Debug statement for slack API content
+
+    if event.get("type") == "message":
         is_text_only = not event.get("files") and event.get("text", "").strip() != ""
         is_thread_reply = event.get("thread_ts") and event["thread_ts"] != event["ts"]
 
         # Skip if it's just a text reply in a thread
         if is_text_only and is_thread_reply:
+            print("Skipping text-only thread reply")
             return "", 200
 
         files = event.get("files", [])
@@ -63,7 +66,7 @@ def slack_events():
             has_attachments = bool(files)
 
             if not has_text and not has_attachments:
-                print(f"[Warning] No text or files found in message at {timestamp_str}")
+                print(f"No text or files found in message at {timestamp_str}")
                 return
 
             # Upload text-only message
@@ -83,7 +86,7 @@ def slack_events():
             total_attachments = len(files)
 
             if not files:
-                print(f"[Warning] Files field empty — no attachments to upload")
+                print(f"Files field empty — no attachments to upload")
                 return
 
             for f_data in files:
@@ -95,7 +98,7 @@ def slack_events():
 
                 local_path = download_file(file_info, SLACK_BOT_TOKEN)
                 if not local_path:
-                    print(f"[Error] Failed to download file: {file_info['name']}")
+                    print(f"Failed to download file: {file_info['name']}")
                     continue
                 
                 if mimetype.startswith(("image/", "video/")):
