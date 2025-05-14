@@ -6,10 +6,10 @@ Slack Drive Archiver is a Python-based webhook server that listens for messages 
 
 The system categorizes uploaded content into folders:
 
-Messages for text-only messages  
-Attachments for messages with only media files like images, videos, or audio  
-Captioned Posts for messages that include both text and one or more attachments  
-Miscellaneous for any other type of file
+- Messages for text-only messages  
+- Attachments for messages with only media files like images, videos, or audio  
+- Captioned Posts for messages that include both text and one or more attachments  
+- Miscellaneous for any other type of file
 
 Each file name begins with the timestamp to ensure chronological ordering, followed by a description, and ends with the sender’s name. Messages posted in Slack threads are ignored, unless they are also sent to the channel.
 
