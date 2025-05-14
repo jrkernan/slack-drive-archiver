@@ -13,14 +13,6 @@ The system categorizes uploaded content into folders:
 
 Each file name begins with the timestamp and ends with the sender’s username. Messages posted in Slack threads are ignored, unless they are also sent to the channel.
 
-## Folder Structure in Google Drive
-
-Slack Archive Root (e.g., "Slack_Uploads")  
-└── channel-name  
-  ├── Messages  
-  ├── Attachments  
-  └── Captioned Posts  
-
 ## Deployment
 
 Clone the repository  
