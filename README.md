@@ -63,17 +63,20 @@ gunicorn slack_event_server:app --bind 0.0.0.0:$PORT
 
 ## Slack and Google Setup
 
-In Slack, create an app with Event Subscriptions enabled.  
-Set the Request URL to the /slack/events endpoint hosted by your service (Either ngrok or Render).  
-Install the app to your workspace.  
-Ensure the bot has permission scopes including channels:read, channels:history, users:read, files:read, groups:history, and groups: read.  
+In Slack: 
+- Create an app with Event Subscriptions enabled
+- Set the Request URL to the /slack/events endpoint hosted by your service (Either ngrok or Render)
+- Install the app to your workspace
+- Ensure the bot has OAUTH permission scopes including channels:read, channels:history, users:read, files:read, groups:history, and groups: read
 
-In Google Cloud Console, create a service account.  
-Download the credentials JSON and share your target Google Drive folder with the service account’s email address.  
-Use the contents of the JSON to populate the GOOGLE_CREDENTIALS_JSON environment variable or credentials.json file.
+In Google Cloud Console:
+- Create a service account
+- Download the credentials JSON
+- Use the contents of the JSON to populate the GOOGLE_CREDENTIALS_JSON environment variable (or credentials.json file).
+- Share your target Google Drive folder with the service account’s email address
 
 ## Notes
 
-Downloaded files are deleted from the server after being uploaded to Google Drive.  
-If a Slack message includes multiple attachments, all are saved and numbered accordingly.  
+- Downloaded files are deleted from the server after being uploaded to Google Drive.  
+- If a Slack message includes multiple attachments, all are saved and numbered.  
 
