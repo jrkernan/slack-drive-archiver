@@ -4,7 +4,7 @@ Slack Drive Archiver is a Python-based webhook server that listens for messages 
 
 ## Features
 
-The system categorizes uploaded content into folders:
+The system categorizes uploaded content into Google Drive folders:
 
 - Messages (for text-only messages)  
 - Attachments (for messages with only media files like images, videos, or audio)  
