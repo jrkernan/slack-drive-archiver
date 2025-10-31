@@ -11,7 +11,7 @@ The system categorizes uploaded content into Google Drive folders:
 - Captioned Posts (for messages that include both text and one or more attachments)  
 - Miscellaneous (for any other type of file)
 
-Each file name begins with the timestamp and ends with the sender’s username. Messages posted in Slack threads are ignored, unless they are also sent to the channel.
+Each file name begins with the timestamp and ends with the sender’s username. Messages posted in reply-threads are ignored, unless they are also sent to the channel.
 
 ## Deployment
 
@@ -23,23 +23,27 @@ pip install -r requirements.txt
 ```
 
 Set the following environment variables:
+
+SLACK_BOT_TOKEN - your bot token from Slack (This will be further explained below)
+
+GOOGLE_DRIVE_FOLDER_ID - the ID of the parent folder in Google Drive where uploads will be organized  
+
 ```
 export SLACK_BOT_TOKEN="xoxb-your-slack-token"
 export GOOGLE_DRIVE_FOLDER_ID="root-folder-id"
+```
+
+Either create a file called credentials.json and paste your Google service account information into the file, or paste the full JSON content into this enviornment variable:
+```
 export GOOGLE_CREDENTIALS_JSON='{"type": "service_account", ...}'
 ```
-SLACK_BOT_TOKEN - your bot token from Slack 
-
-GOOGLE_CREDENTIALS_JSON - the full JSON content from your Google service account (or create a file called credentials.json that contains the same information)
-
-GOOGLE_DRIVE_FOLDER_ID - the ID of the parent folder in Google Drive where uploads will be organized  
 
 To run locally:
 ```
 python3 slack_event_server.py
 ```  
 
-A web server is also needed for Slack communication. 
+A web server is needed for Slack communication. 
 
 For local testing I used ngrok:
 
